@@ -7,6 +7,8 @@ import {
 } from '@angular/core';
 import { DynamicContentOutletErrorComponent } from './dynamic-content-outlet-error.component';
 import { DynamicContentOutletRegistry } from './dynamic-content-outlet.registry';
+import { ModuleWithEntryComponentsMap } from './../common/types';
+
 
 @Injectable()
 export class DynamicContentOutletService {
@@ -25,18 +27,19 @@ export class DynamicContentOutletService {
       );
     }
 
-    const componentType = this.getComponentTypeForComponent(componentName);
+    try {
+      const moduleFactory = await this.moduleLoader.load(modulePath);
+      const moduleReference = moduleFactory.create(this.injector);
+      const componentResolver = moduleReference.componentFactoryResolver;
+
+      const componentType = (moduleFactory.moduleType as ModuleWithEntryComponentsMap)
+      .entryComponentsMap[componentName];
 
     if (!componentType) {
       return this.getDynamicContentErrorComponent(
         `Unable to derive componentType from component: ${componentName} in dynamic-content.registry.ts`
       );
     }
-
-    try {
-      const moduleFactory = await this.moduleLoader.load(modulePath);
-      const moduleReference = moduleFactory.create(this.injector);
-      const componentResolver = moduleReference.componentFactoryResolver;
 
       const componentFactory = componentResolver.resolveComponentFactory(
         componentType
@@ -61,18 +64,6 @@ export class DynamicContentOutletService {
     if (registryItem && registryItem.modulePath) {
       // imported modules must be in the format 'path#moduleName'
       return `${registryItem.modulePath}#${registryItem.moduleName}`;
-    }
-
-    return null;
-  }
-
-  private getComponentTypeForComponent(componentName: string) {
-    const registryItem = DynamicContentOutletRegistry.find(
-      i => i.componentName === componentName
-    );
-
-    if (registryItem && registryItem.componentType) {
-      return registryItem.componentType;
     }
 
     return null;
